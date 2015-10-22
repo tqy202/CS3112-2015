@@ -24,9 +24,21 @@
 #define MAX_TIMESTEPS 6 
 float timeLeftOver = 0.0f;
 
+class Texture;
+class Entity;
+
 SDL_Window* displayWindow;
 enum GameState { STATE_MAIN_MENU, STATE_GAME_LEVEL, STATE_GAME_OVER };
+enum CollisionState { COLLISION_TOP, COLLISION_BOTTOM, COLLISION_LEFT, COLLISION_RIGHT };
+float grav = 0.1;
+float viewX;
+float viewY;
+Matrix projectionMatrix;
+//Matrix modelMatrix;
+Matrix viewMatrix;
 
+
+std::list<Entity> nuts;
 std::vector<Entity> entities;
 std::vector<Texture> textures;
 
@@ -53,67 +65,108 @@ public:
 	int spriteCountX;
 	int spriteCountY;
 	GLuint sheet;
-
 };
 
 class Entity{
 public:
-	Entity(float x1, float y1, float h, float w, float s, int tex, int index, Texture &sheet, bool sta = false) :
+	Entity(float x1, float y1, float h, float w, float s, size_t tex, int index, Texture &sheet, bool sta = false) :
 		x(x1), y(y1), height(h), width(w), speed(s), texture(tex), stat(sta) {
 		matrix.identity();
-		float u = (float)(((int)index) % sheet.spriteCountX) / (float)sheet.spriteCountX; 
-		float v = (float)(((int)index) / sheet.spriteCountX) / (float)sheet.spriteCountY;
-		float spriteWidth = 1.0 / (float)sheet.spriteCountX;
-		float spriteHeight = 1.0 / (float)sheet.spriteCountY;
-		
-		vertices[0]= -1 * width;
-		vertices[1]= -1 * height;
-		vertices[2]= width;
-		vertices[3]= height;
-		vertices[4]= -1 * width;
-		vertices[5]= height;
-		vertices[6]= width;
-		vertices[7]= height;
-		vertices[8]= -1 * width;
-		vertices[9]= -1 * height;
-		vertices[10]= width;
-		vertices[11]= -1 * height;
+		u = (float)(((int)index) % sheet.spriteCountX) / (float)sheet.spriteCountX; 
+		v = (float)(((int)index) / sheet.spriteCountX) / (float)sheet.spriteCountY;
+		spriteWidth = 1.0 / (float)sheet.spriteCountX;
+		spriteHeight = 1.0 / (float)sheet.spriteCountY;
 
-		vertices[0]= u;
-		vertices[1]= v + spriteHeight; 
-		vertices[2]= u + spriteWidth;
-		vertices[3]= v;
-		vertices[4]= u;
-		vertices[5]= v;
-		vertices[6]= u + spriteWidth;
-		vertices[7]= v;
-		vertices[8]= u;
-		vertices[9]= v + spriteHeight; 
-		vertices[10]=u + spriteWidth;
-		vertices[11]=v + spriteHeight;
+		collsion[0] = false;
+		collsion[1] = false;
+		collsion[2] = false;
+		collsion[3] = false;
 	}
-	~Entity(){
-		delete texCoords;
-		delete vertices;
-	}
+	~Entity(){}
 	//private:
 	float x;
 	float y;
+	float u;
+	float v;
+	float spriteWidth;
+	float spriteHeight;
 	float speed;
 	float height;
 	float width;
-	float vertices[12];
-	GLfloat texCoords[12];
+	bool collsion[4];
 	bool stat;
-	int texture;
+	size_t texture;
 	Matrix matrix;
 };
 
+void gravity(Entity &ent){
+	ent.y -= grav;
+}
+
+void collsionTest(Entity &ent){
+	for (Entity &bast : nuts){
+		if (ent.y + ent.height / 2 >= bast.y - bast.height / 2){
+			ent.y = bast.y - bast.height / 2 - ent.height / 2;
+			ent.collsion[COLLISION_RIGHT] = true;
+		}
+		else
+			ent.collsion[COLLISION_RIGHT] = false;
+
+		if (ent.y - ent.height / 2 <= bast.y + bast.height / 2){
+			ent.y = bast.y + bast.height / 2 + ent.height / 2;
+			ent.collsion[COLLISION_LEFT] = true;
+		}
+		else
+			ent.collsion[COLLISION_LEFT] = false;
+
+		if (ent.x + ent.width / 2 >= bast.x - bast.width / 2){
+			ent.x = bast.x - bast.width / 2 - ent.width / 2;
+			ent.collsion[COLLISION_TOP] = true;
+		}
+		else
+			ent.collsion[COLLISION_TOP] = false;
+
+		if (ent.x - ent.width / 2 <= bast.x + bast.width / 2){
+			ent.x = ent.width / 2 + bast.x + bast.width / 2;
+			ent.collsion[COLLISION_BOTTOM] = true;
+		}
+		else
+			ent.collsion[COLLISION_BOTTOM] = false;
+
+	}
+}
+
 void updateGame(){
+	for (std::list<Entity>::iterator itr = nuts.begin(); itr != nuts.end(); itr++){
+		if (itr->x + itr->width / 2 < viewX - 4.0 && itr->y + itr->height / 2 - viewY - 3.0)
+			itr = nuts.erase(itr);
+	}
+	for (Entity &ent : entities){
+		if (!ent.stat && !ent.collsion[COLLISION_BOTTOM])
+			gravity(ent);
+	}
+	//if (entities.front()){
+		if (entities.at(0).x > viewX){
+			viewMatrix.Translate(viewX - entities.at(0).x, 0, 0);
+			viewX = entities.at(0).x;
+		}
+		if (entities.at(0).y > viewY){
+			viewMatrix.Translate(0, viewY - entities.at(0).y, 0);
+			viewY = entities.at(0).y;
+		}
+	//}
 	
 }
 
+void setupGame(){
+	srand(time(NULL));
+	viewMatrix.identity();
+	viewX = 0;
+	viewY = 0;
+	entities.push_back(Entity(0,0, 0.1, 0.05, 0.1, 1, 0, textures.at(1), true));
+	nuts.push_back(Entity(0.1, -0.1, 0.2, 1.0, 0, 1, 3, textures.at(1)));
 
+}
 
 int main(int argc, char *argv[])
 {
@@ -131,18 +184,18 @@ int main(int argc, char *argv[])
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
-	Matrix projectionMatrix;
-	Matrix modelMatrix;
-	Matrix viewMatrix;
 	projectionMatrix.setOrthoProjection(-2.0f, 2.0f, -1.0f, 1.0f, -1.0f, 1.0f);
 
 	float portWidth = 640;
 	float portHeight = 360;
 
-	int state = STATE_MAIN_MENU;
+	int state = STATE_GAME_LEVEL;
 	float lastFrameTicks = 0.0f;
 	bool done = false;
 
+	textures.push_back(Texture("font1.png", 16, 16));
+	textures.push_back(Texture("blanks.png", 2, 2));
+	setupGame();
 
 	while (!done) {
 		while (SDL_PollEvent(&event)) {
@@ -150,6 +203,7 @@ int main(int argc, char *argv[])
 				done = true;
 			}
 		}
+
 		float ticks = (float)SDL_GetTicks() / 1000.0f;
 		float elapsed = ticks - lastFrameTicks;
 		lastFrameTicks = ticks;
@@ -158,8 +212,14 @@ int main(int argc, char *argv[])
 //input
 		switch (state) {
 			case STATE_MAIN_MENU:
-					break;
+				break;
 			case STATE_GAME_LEVEL:
+				if (keys[SDL_SCANCODE_D]){
+					entities.at(0).x += entities.at(0).speed * elapsed;
+				}
+				else if (keys[SDL_SCANCODE_A]){
+					entities.at(0).x = entities.at(0).x - entities.at(0).speed * elapsed;
+				}
 				break;
 			case STATE_GAME_OVER:
 				break;
@@ -170,6 +230,7 @@ int main(int argc, char *argv[])
 			case STATE_MAIN_MENU:
 				break; 
 			case STATE_GAME_LEVEL:
+				//updateGame();
 				break;
 			case STATE_GAME_OVER:
 				break;
@@ -183,6 +244,41 @@ int main(int argc, char *argv[])
 			case STATE_MAIN_MENU:
 				break;
 			case STATE_GAME_LEVEL:
+				for (Entity &ent : nuts){
+					float vertices[] = { -1 * ent.width, -1 * ent.height, ent.width, ent.height, -1 * ent.width, 
+						ent.height, ent.width, ent.height, -1 * ent.width, -1 * ent.height, ent.width, -1 * ent.height };
+
+					GLfloat texCoords[] = { ent.u, ent.v + ent.spriteHeight, ent.u + ent.spriteWidth, ent.v, ent.u, 
+						ent.v, ent.u + ent.spriteWidth, ent.v, ent.u, ent.v + ent.spriteHeight, ent.u + 
+						ent.spriteWidth, ent.v + ent.spriteHeight };
+
+					glVertexAttribPointer(program.positionAttribute, 2, GL_FLOAT, false, 0, vertices);
+					glEnableVertexAttribArray(program.positionAttribute);
+					glVertexAttribPointer(program.texCoordAttribute, 2, GL_FLOAT, false, 0, texCoords);
+					glEnableVertexAttribArray(program.texCoordAttribute);
+					glBindTexture(GL_TEXTURE_2D, textures[ent.texture].sheet);
+					program.setModelMatrix(ent.matrix);
+					glDrawArrays(GL_TRIANGLES, 0, 6);
+					glDisableVertexAttribArray(program.positionAttribute);
+					glDisableVertexAttribArray(program.texCoordAttribute);
+				}
+				for (Entity &ent : entities){
+					float vertices[] = { -1 * ent.width, -1 * ent.height, ent.width, ent.height, -1 * ent.width,
+						ent.height, ent.width, ent.height, -1 * ent.width, -1 * ent.height, ent.width, -1 * ent.height };
+
+					GLfloat texCoords[] = { ent.u, ent.v + ent.spriteHeight, ent.u + ent.spriteWidth, ent.v, ent.u,
+						ent.v, ent.u + ent.spriteWidth, ent.v, ent.u, ent.v + ent.spriteHeight, ent.u +
+						ent.spriteWidth, ent.v + ent.spriteHeight };
+					glVertexAttribPointer(program.positionAttribute, 2, GL_FLOAT, false, 0, vertices);
+					glEnableVertexAttribArray(program.positionAttribute);
+					glVertexAttribPointer(program.texCoordAttribute, 2, GL_FLOAT, false, 0, texCoords);
+					glEnableVertexAttribArray(program.texCoordAttribute);
+					glBindTexture(GL_TEXTURE_2D, textures[ent.texture].sheet);
+					program.setModelMatrix(ent.matrix);
+					glDrawArrays(GL_TRIANGLES, 0, 6);
+					glDisableVertexAttribArray(program.positionAttribute);
+					glDisableVertexAttribArray(program.texCoordAttribute);
+				}
 				break;
 			case STATE_GAME_OVER:
 				break;
