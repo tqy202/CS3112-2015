@@ -4,11 +4,11 @@
 #else
 #define RESOURCE_FOLDER "NYUCodebase.app/Contents/Resources/"
 #endif
-GLuint LoadTexture(const char *image_path) {
+GLuint* LoadTexture(const char *image_path) {
 	SDL_Surface *surface = IMG_Load(image_path);
-	GLuint textureID;
-	glGenTextures(1, &textureID);
-	glBindTexture(GL_TEXTURE_2D, textureID);
+	GLuint* textureID = new GLuint();
+	glGenTextures(1, textureID);
+	glBindTexture(GL_TEXTURE_2D, *textureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, surface->w, surface->h, 0, GL_RGBA,
 		GL_UNSIGNED_BYTE, surface->pixels);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -33,8 +33,8 @@ void ClassDemoApp::Setup() {
 	program = new ShaderProgram(RESOURCE_FOLDER"vertex.glsl", RESOURCE_FOLDER"fragment.glsl");
 	projectionMatrix.setOrthoProjection(-1.33f, 1.33f, -1.0f, 1.0f, -1.0f, 1.0f);
 	bool done = false;
-	fontTexture = LoadTexture("pixel_font.png");
-	spriteSheet = LoadTexture("sprites.png");
+	textures.push_back(LoadTexture("pixel_font.png"));
+	textures.push_back(LoadTexture("sprites.png"));
 	int state = 0;
 	amAlive = true;
 	score = 0;
@@ -57,8 +57,10 @@ void ClassDemoApp::Setup() {
 }
 ClassDemoApp::~ClassDemoApp() {
 	delete player;
-	for (GLuint i = 0; i < playerBullets.size(); i++) { delete playerBullets[i]; }
+	//for (GLuint i = 0; i < playerBullets.size(); i++) { delete playerBullets[i]; }
 	for (GLuint i = 0; i < aliensSprites.size(); i++) { delete aliensSprites[i]; }
+	for(GLuint i = 0; i < Bullets.size(); i++) { delete Bullets[i]; }
+	for(GLuint i = 0; i < textures.size(); i++) { delete textures[i]; }
 	SDL_Quit();
 }
 void ClassDemoApp::DrawText(int fontTexture, std::string text, float size, float spacing) {
@@ -154,76 +156,79 @@ void ClassDemoApp::Update(float elapsed) {
 			state++;
 		}
 		else{
-			if (alien->velocityXPos< 0 && (alien->xpos < -1.255)){
+			/*if (alien->velocityXPos< 0 && (alien->xpos < -1.255)){
 				for (Entity* j : aliensSprites){
-					j->velocityXPos = 0.3f;
-					j->ypos -= .05f;
+				j->velocityXPos = 0.3f;
+				j->ypos -= .05f;
 				}
-			}
-			else if (alien->velocityXPos > 0){
+				}
+				else if (alien->velocityXPos > 0){
 				for (size_t i = 0; i < aliensSprites.size(); i++){
-					if (aliensSprites[i] != NULL){
-						alien = aliensSprites[i];
-					}
+				if (aliensSprites[i] != NULL){
+				alien = aliensSprites[i];
+				}
 				}
 				if (alien->xpos > 1.255){
-					for (Entity* h : aliensSprites){
-						h->velocityXPos = -0.3f;
-						h->ypos -= .05f;
-					}
+				for (Entity* h : aliensSprites){
+				h->velocityXPos = -0.3f;
+				h->ypos -= .05f;
 				}
-			}
-		}
-		timesincelastfire += elapsed;
-		if (keys[SDL_SCANCODE_SPACE]){
-			if (timesincelastfire > 0.8){
+				}
+				}
+				}
+				timesincelastfire += elapsed;
+				if (keys[SDL_SCANCODE_SPACE]){
+				if (timesincelastfire > 0.8){
 				//then make a new bullet
-				playerBullets.push_back(new Entity(player->xpos, (player->ypos + player->iheight), .03f, player->iheight));
+				//playerBullets.push_back(new Entity(player->xpos, (player->ypos + player->iheight), .03f, player->iheight));
 				// then we take the most recent bullet and make it have a velocity in the y direction so it can move upwards
-				playerBullets[playerBullets.size() - 1]->velocityYPos = 0.6f;
+				//playerBullets[playerBullets.size() - 1]->velocityYPos = 0.6f;
 				//reset the time since the last bullet fired so you can check for that elapsed time again
 				timesincelastfire = 0.0f;
-			}
-		}
-		for (size_t i = 0; i < playerBullets.size(); i++){
-			if (playerBullets[i]->ypos > 1.3){
+				}
+				}
+				for (size_t i = 0; i < playerBullets.size(); i++){
+				if (playerBullets[i]->ypos > 1.3){
 				// when the bullet goes out of the screen, let's delete them.
 				delete playerBullets[i];
 				playerBullets.erase(playerBullets.begin() + i);
-			}
-		}
-		for (size_t i = 0; i < playerBullets.size(); i++){
-			Entity* k = playerBullets[i];
-			for (size_t j = 0; j < aliensSprites.size(); j++){
+				}
+				}
+				for (size_t i = 0; i < playerBullets.size(); i++){
+				Entity* k = playerBullets[i];
+				for (size_t j = 0; j < aliensSprites.size(); j++){
 				Entity* a = aliensSprites[j];
 				// collision detection
 				if (!(
-					(k->ypos - (k->iheight / 2)) >(a->ypos + (a->iheight / 2)) ||
-					(k->ypos + (k->iheight / 2)) < (a->ypos - (a->iheight / 2)) ||
-					(k->xpos - (k->iwidth / 2)) > (a->xpos + (a->iwidth / 2)) ||
-					(k->xpos + (k->iwidth / 2)) < (a->xpos - (a->iwidth / 2))
-					))
+				(k->ypos - (k->iheight / 2)) >(a->ypos + (a->iheight / 2)) ||
+				(k->ypos + (k->iheight / 2)) < (a->ypos - (a->iheight / 2)) ||
+				(k->xpos - (k->iwidth / 2)) > (a->xpos + (a->iwidth / 2)) ||
+				(k->xpos + (k->iwidth / 2)) < (a->xpos - (a->iwidth / 2))
+				))
 				{
-					delete playerBullets[i];
-					playerBullets.erase(playerBullets.begin() + i);
-					delete aliensSprites[j];
-					aliensSprites.erase(aliensSprites.begin() + j);
-					break;
+				delete playerBullets[i];
+				playerBullets.erase(playerBullets.begin() + i);
+				delete aliensSprites[j];
+				aliensSprites.erase(aliensSprites.begin() + j);
+				break;
 				}
-			
-			}
-		}
-		//update the aliens
-		for (Entity* t : aliensSprites){
-			t->Update(elapsed);
-		}
-		//update the bullets
-		for (Entity* t : playerBullets){
-			t->Update(elapsed);
+
+				}
+				}
+				//update the aliens
+				for (Entity* t : aliensSprites){
+				t->Update(elapsed);
+				}
+				//update the bullets
+				for (Entity* t : playerBullets){
+				t->Update(elapsed);
+				}
+				}
+				// move things based on time passed
+				// check for collisions and respond to them
+				*/
 		}
 	}
-	// move things based on time passed
-	// check for collisions and respond to them
 }
 bool ClassDemoApp::UpdateAndRender() {
 	float ticks = (float)SDL_GetTicks() / 1000.0f;
@@ -238,18 +243,18 @@ bool ClassDemoApp::UpdateAndRender() {
 void ClassDemoApp::RenderMenu(){
 	modelMatrix.identity();
 	modelMatrix.Translate(-0.69f, 0.7f, 0.0);
-	DrawText(fontTexture, "My SpaceInvaders Game", 0.13f, 0.0f);
+	//DrawText(fontTexture, "My SpaceInvaders Game", 0.13f, 0.0f);
 }
 
 void ClassDemoApp::RenderGame(){
-	modelMatrix.identity();
+	/*modelMatrix.identity();
 	for (size_t i = 0; i < aliensSprites.size(); i++) {
 		aliensSprites[i]->Render(program);
 	}
 	for (Entity* y : playerBullets){
 		y->Render(program);
 	}
-	player->Render(program);
+	player->Render(program);*/
 }
 void ClassDemoApp::win(){
 	modelMatrix.identity();

@@ -12,7 +12,7 @@
 #include "MyEntity.h"
 
 enum GameState { STATE_MENU, STATE_GAME, STATE_END };
-GLuint LoadTexture(const char *image_path);
+GLuint* LoadTexture(const char *image_path);
 class ClassDemoApp {
 public:
 	ClassDemoApp();
